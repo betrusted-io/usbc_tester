@@ -42,60 +42,26 @@ SPI_FLASH_SIZE = 1 * 1024 * 1024
 
 io = [
     ("serial", 0,
-     Subsignal("rx", Pins("48")),  # MON0
-     Subsignal("tx", Pins("3")),  # MON1
+     Subsignal("rx", Pins("42")),
+     Subsignal("tx", Pins("38")),
      IOStandard("LVCMOS33")
      ),
-    # serial is muxed in with these key monitor pins
-#    ("up5k_keycol0", 0, Pins("48"), IOStandard("LVCMOS33")),
-#    ("up5k_keycol1", 0, Pins("3"), IOStandard("LVCMOS33")),  # this is marking "high"
-    ("up5k_keyrow0", 0, Pins("4"), IOStandard("LVCMOS33")),
-    ("up5k_keyrow1", 0, Pins("2"), IOStandard("LVCMOS33")),
 
     ("spiflash", 0,
-     Subsignal("cs_n", Pins("16"), IOStandard("LVCMOS18")),
-     Subsignal("clk", Pins("15"), IOStandard("LVCMOS18")),
-     Subsignal("cipo", Pins("17"), IOStandard("LVCMOS18")),
-     Subsignal("copi", Pins("14"), IOStandard("LVCMOS18")),
-     Subsignal("wp", Pins("18"), IOStandard("LVCMOS18")),
-     Subsignal("hold", Pins("13"), IOStandard("LVCMOS18")),
+     Subsignal("cs_n", Pins("16"), IOStandard("LVCMOS33")),
+     Subsignal("clk", Pins("15"), IOStandard("LVCMOS33")),
+     Subsignal("cipo", Pins("17"), IOStandard("LVCMOS33")),
+     Subsignal("copi", Pins("14"), IOStandard("LVCMOS33")),
+     Subsignal("wp", Pins("18"), IOStandard("LVCMOS33")),
+     Subsignal("hold", Pins("13"), IOStandard("LVCMOS33")),
      ),
     ("spiflash4x", 0,
-     Subsignal("cs_n", Pins("16"), IOStandard("LVCMOS18")),
-     Subsignal("clk", Pins("15"), IOStandard("LVCMOS18")),
-     Subsignal("dq", Pins("14 17 18 13"), IOStandard("LVCMOS18")),
+     Subsignal("cs_n", Pins("16"), IOStandard("LVCMOS33")),
+     Subsignal("clk", Pins("15"), IOStandard("LVCMOS33")),
+     Subsignal("dq", Pins("14 17 18 13"), IOStandard("LVCMOS33")),
      ),
 
-    # I2C
-    ("i2c", 0,
-     Subsignal("scl", Pins("23"), IOStandard("LVCMOS18")),
-     Subsignal("sda", Pins("25"), IOStandard("LVCMOS18")),
-     Subsignal("gg_int_n", Pins("37"), IOStandard("LVCMOS18")),     # DVT / mux to LPCLK if we want to go very low power
-     Subsignal("gyro_int_n", Pins("43"), IOStandard("LVCMOS18")),
-     Subsignal("usbcc_int_n", Pins("42"), IOStandard("LVCMOS18")),  # DVT
-    ),
-
-    ("clk12", 0, Pins("35"), IOStandard("LVCMOS18")),
-
-    ("com", 0,
-        Subsignal("csn", Pins("11"), IOStandard("LVCMOS18")),
-        Subsignal("cipo", Pins("10"), IOStandard("LVCMOS18")),
-        Subsignal("copi", Pins("9"), IOStandard("LVCMOS18")),
-        Subsignal("irq", Pins("6"), IOStandard("LVCMOS18")), # ACTIVE HIGH
-        Subsignal("hold", Pins("12"), IOStandard("LVCMOS18")),
-     ),
-    ("com_sclk", 0, Pins("20"), IOStandard("LVCMOS18")),
-
-    ("extcommin", 0, Pins("45"), IOStandard("LVCMOS33")),
-    ("lcd_disp", 0, Pins("44"), IOStandard("LVCMOS33")),
-
-    ("power", 0,
-        Subsignal("s0", Pins("19"), IOStandard("LVCMOS18")),
-        # Subsignal("s1", Pins("12"), IOStandard("LVCMOS18")),  # PVT changed to hold
-        Subsignal("sys_on", Pins("47"), IOStandard("LVCMOS33")), # sys_on
-        Subsignal("u_to_t_on", Pins("46"), IOStandard("LVCMOS33")), # u_to_t_on
-        Subsignal("fpga_dis", Pins("21"), IOStandard("LVCMOS18")), # fpga_dis
-     ),
+    ("clk12", 0, Pins("35"), IOStandard("LVCMOS33")),
 
     ("led", 0,
          Subsignal("rgb0", Pins("39"), IOStandard("LVCMOS33")),
@@ -103,17 +69,36 @@ io = [
          Subsignal("rgb2", Pins("41"), IOStandard("LVCMOS33")),
      ),
 
-    ("wifi", 0,
-         Subsignal("cipo", Pins("27"), IOStandard("LVCMOS18")),
-         Subsignal("copi", Pins("28"), IOStandard("LVCMOS18")),
-         Subsignal("csn", Pins("32"), IOStandard("LVCMOS18")),
-         Subsignal("sclk", Pins("26"), IOStandard("LVCMOS18")),
-         Subsignal("pa_enable", Pins("34"), IOStandard("LVCMOS18")),
-         Subsignal("res_n", Pins("36"), IOStandard("LVCMOS18")),
-         Subsignal("wirq", Pins("31"), IOStandard("LVCMOS18")),
-         Subsignal("wakeup", Pins("38"), IOStandard("LVCMOS18")),
+    ("adc", 0,
+     Subsignal("sclk", Pins("23"), IOStandard("LVCMOS33")),
+     Subsignal("cipo", Pins("25"), IOStandard("LVCMOS33")),
+     Subsignal("copi", Pins("26"), IOStandard("LVCMOS33")),
+     Subsignal("cs0_n", Pins("27"), IOStandard("LVCMOS33")),
+     Subsignal("cs1_n", Pins("32"), IOStandard("LVCMOS33")),
      ),
-    # ("lpclk", 0, Pins("37"), IOStandard("LVCMOS18")),  # conflicts with SB_PLL40_2_PAD...what weirdness
+
+    ("screen", 0, Pins("31"), IOStandard("LVCMOS33")),
+
+    ("run", 0, Pins("28"), IOStandard("LVCMOS33")),
+
+    ("dut", 0,
+     Subsignal("d2_p_a6", Pins("12"), IOStandard("LVCMOS33")),
+     Subsignal("d2_n_a7", Pins("21"), IOStandard("LVCMOS33")),
+     Subsignal("vbus_ex", Pins("20"), IOStandard("LVCMOS33")),
+     Subsignal("gnd_ex",  Pins("19"), IOStandard("LVCMOS33")),
+     Subsignal("gnd_b12", Pins("11"), IOStandard("LVCMOS33")),
+     Subsignal("vbus_b9", Pins("10"), IOStandard("LVCMOS33")),
+     Subsignal("cc2_b5",  Pins("9"), IOStandard("LVCMOS33")),
+     Subsignal("gnd_b1",  Pins("6"), IOStandard("LVCMOS33")),
+     Subsignal("gnd_a1",  Pins("4"), IOStandard("LVCMOS33")),
+     Subsignal("vbus_a4", Pins("3"), IOStandard("LVCMOS33")),
+     Subsignal("cc1_a5",  Pins("48"), IOStandard("LVCMOS33")),
+     Subsignal("vbus_a9", Pins("45"), IOStandard("LVCMOS33")),
+     Subsignal("d1_p_a6", Pins("47"), IOStandard("LVCMOS33")),
+     Subsignal("d1_n_a7", Pins("44"), IOStandard("LVCMOS33")),
+     Subsignal("gnd_a12", Pins("46"), IOStandard("LVCMOS33")),
+     Subsignal("vbus_b4", Pins("2"), IOStandard("LVCMOS33")),
+     ),
 ]
 
 clk_options = {
@@ -122,6 +107,115 @@ clk_options = {
     "overclock" : 21e6,
 }
 clk_freq=clk_options["stable"]
+
+
+# Dut -------------------------------------------------------------------------------------------
+
+class Dut(Module, AutoDoc, AutoCSR):
+    def __init__(self, pads, run_pad):
+        self.intro = ModuleDoc("""DUT drivers""")
+        sut_names = [
+            "d2_p_a6",
+            "d2_n_a7",
+            "vbus_ex",
+            "gnd_ex",
+            "gnd_b12",
+            "vbus_b9",
+            "cc2_b5",
+            "gnd_b1",
+            "gnd_a1",
+            "vbus_a4",
+            "cc1_a5",
+            "vbus_a9",
+            "d1_p_a6",
+            "d1_n_a7",
+            "gnd_a12",
+            "vbus_b4",
+        ]
+        sut_fields = []
+        for sut in sut_names:
+            sut_fields.append(
+                CSRField(sut, size=1, description="Set to connect {} to test source".format(sut), reset=0)
+            )
+        self.dut = CSRStorage(len(sut_names), reset="0", name="dut",
+            description="Bits that drive the DUT signal switches", fields=sut_fields,
+        )
+        for sut in sut_names:
+            self.comb += getattr(pads, sut).eq(getattr(self.dut.fields, sut))
+
+        self.run = CSRStatus(1, name="run", description="Pulled low when the `run` switch is depressed")
+        self.comb += self.run.status.eq(run_pad)
+
+# ADC -------------------------------------------------------------------------------------------
+class Adc(Module, AutoDoc, AutoCSR):
+    def __init__(self, pads):
+        self.intro = ModuleDoc("""ADC interface""")
+        self.ctrl = CSRStorage(name="control", fields=[
+            CSRField("channel", size=4, description="Select the ADC channel"),
+            CSRField("go", size=1, description="Start the conversion", pulse=True),
+        ])
+        self.result = CSRStatus(name="result", fields=[
+            CSRField("data", size=8, description="Result of last conversion")
+        ])
+        fsm = FSM(reset_state="IDLE")
+        self.submodules += fsm
+        sclk = Signal()
+        cipo = Signal()
+        copi = Signal()
+        cs_n = Signal(2)
+        self.comb += [
+            pads.sclk.eq(sclk),
+            pads.copi.eq(copi),
+            cipo.eq(pads.cipo),
+            pads.cs0_n.eq(cs_n[0]),
+            pads.cs1_n.eq(cs_n[1])
+        ]
+        cycle = Signal(4)
+        fsm.act("IDLE",
+            NextValue(sclk, 1),
+            NextValue(copi, 0),
+            NextValue(cycle, 0),
+            If(self.ctrl.fields.go,
+                NextState("PHASE0"),
+                If(self.ctrl.fields.channel[3] == 0,
+                    NextValue(cs_n, 0b10)
+                ).Else(
+                    NextValue(cs_n, 0b01)
+                )
+            ).Else(
+                NextValue(cs_n, 0b11),
+            )
+        )
+        fsm.act("PHASE0",
+            NextValue(sclk, 0),
+            NextState("PHASE1")
+        ),
+        fsm.act("PHASE1",
+            If(cycle == 2,
+                NextValue(copi, self.ctrl.fields.channel[2])
+            ).Elif(cycle == 3,
+                NextValue(copi, self.ctrl.fields.channel[1])
+            ).Else(
+                NextValue(copi, self.ctrl.fields.channel[0])
+            ),
+            NextState("PHASE3")
+        ),
+        fsm.act("PHASE3",
+            NextValue(sclk, 1),
+            NextState("PHASE4"),
+        ),
+        fsm.act("PHASE4",
+            If(cycle < 0xf,
+                NextValue(cycle, cycle + 1),
+                NextState("PHASE0")
+            ).Else(
+                NextState("IDLE")
+            ),
+            If((cycle >= 4) & (cycle <= 11),
+                NextValue(self.result.fields.data, Cat(cipo,self.result.fields.data[:-1]))
+            ),
+        )
+
 
 class BetrustedPlatform(LatticePlatform):
     def __init__(self, io, toolchain="icestorm"):
@@ -162,11 +256,8 @@ class BetrustedPlatform(LatticePlatform):
                 self.cd_sys.rst.eq(reset_cascade4),
             ]
 
-            # generate a >1us-wide pulse at ~1Hz based on sysclk for display extcomm signal
-            # count down from 12e6 to 0 so that first extcomm pulse comes after lcd_disp is high
-            # note: going to a 25-bit counter makes this the critical path at speeds > 12 MHz, so stay with
-            # 24 bits but a faster extcomm clock.
-            extcomm = platform.request("extcommin", 0)
+            # generate a >1us-wide pulse at ~1Hz based on sysclk. From legacy code, WDT depends on it.
+            extcomm = Signal()
             extcomm_div = Signal(24, reset=int(12e6)) # datasheet range is 0.5Hz - 5Hz, so actual speed is 1.5Hz
             self.sync += [
                 If(extcomm_div == 0,
@@ -181,7 +272,6 @@ class BetrustedPlatform(LatticePlatform):
                    extcomm.eq(0)
                 )
             ]
-            self.comb += platform.request("lcd_disp", 0).eq(1)  # force display on for now
 
             ### WATCHDOG RESET, uses the extcomm_div divider to save on gates
             self.watchdog = CSRStorage(17, fields=[
@@ -276,12 +366,6 @@ class BetrustedPlatform(LatticePlatform):
             self.clock_domains.cd_sclk = ClockDomain()
             clk_sclk = Signal()
             self.comb += self.cd_sclk.clk.eq(clk_sclk)
-
-            self.specials += Instance(
-                "SB_GB",
-                i_USER_SIGNAL_TO_GLOBAL_BUFFER=platform.request("com_sclk"),
-                o_GLOBAL_BUFFER_OUTPUT=clk_sclk,
-            )
 
             # Add a period constraint for each clock wire.
             # NextPNR picks the clock domain's name randomly from one of the wires
@@ -629,6 +713,34 @@ class BaseSoC(SoCCore):
         self.submodules.ticktimer = TickTimer(1000, clk_freq, bits=40)
         self.add_csr("ticktimer")
         self.add_interrupt("ticktimer")
+
+        # Dut --------------------------------------------------------------------------------------------
+        self.submodules.dut = Dut(platform.request("dut"), platform.request("run"))
+        self.add_csr("dut")
+
+        # Adc --------------------------------------------------------------------------------------------
+        self.submodules.adc = Adc(platform.request("adc"))
+        self.add_csr("adc")
+
+        # Scope ------------------------------------------------------------------------------------------
+        serial_layout = [("tx", 1), ("rx", 1)]
+        screen_pads = Record(serial_layout)
+        screen = platform.request("screen")
+        self.comb += [
+            screen.eq(screen_pads.tx),
+            screen_pads.rx.eq(1),
+        ]
+        self.submodules.screen_phy = uart.UARTPHY(
+            pads=screen_pads,
+            clk_freq=clk_freq,
+            baudrate=9600)
+        self.submodules.uart = ResetInserter()(uart.UART(self.screen_phy,
+        tx_fifo_depth=16,
+        rx_fifo_depth=16))
+        self.add_csr("screen_phy")
+        self.add_csr("screen")
+        self.add_interrupt("screen")
+
 
         #### Platform config & build below ---------------------------------------------------------------
         # Override default LiteX's yosys/build templates
