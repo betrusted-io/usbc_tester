@@ -1,0 +1,16 @@
+[workspace]
+members = [
+  "sw",
+  "svd2utra",
+  "xtask",
+]
+
+exclude = [
+  "utralib", # this is machine generated
+]
+
+[profile.release]
+opt-level = "z"
+codegen-units = 1  # more optimization
+lto = "fat"
+panic = "abort"
