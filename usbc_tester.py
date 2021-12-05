@@ -155,7 +155,8 @@ class Adc(Module, AutoDoc, AutoCSR):
             CSRField("go", size=1, description="Start the conversion", pulse=True),
         ])
         self.result = CSRStatus(name="result", fields=[
-            CSRField("data", size=8, description="Result of last conversion")
+            CSRField("data", size=8, description="Result of last conversion"),
+            CSRField("running", size=1, description="Conversion is running"),
         ])
         fsm = FSM(reset_state="IDLE")
         self.submodules += fsm
@@ -171,11 +172,14 @@ class Adc(Module, AutoDoc, AutoCSR):
             pads.cs1_n.eq(cs_n[1])
         ]
         cycle = Signal(4)
+        run = Signal()
+        self.comb += self.result.fields.running.eq(run | self.ctrl.fields.go)
         fsm.act("IDLE",
             NextValue(sclk, 1),
             NextValue(copi, 0),
             NextValue(cycle, 0),
             If(self.ctrl.fields.go,
+                NextValue(run, 1),
                 NextState("PHASE0"),
                 If(self.ctrl.fields.channel[3] == 0,
                     NextValue(cs_n, 0b10)
@@ -183,6 +187,7 @@ class Adc(Module, AutoDoc, AutoCSR):
                     NextValue(cs_n, 0b01)
                 )
             ).Else(
+                NextValue(run, 0),
                 NextValue(cs_n, 0b11),
             )
         )
@@ -198,21 +203,27 @@ class Adc(Module, AutoDoc, AutoCSR):
             ).Else(
                 NextValue(copi, self.ctrl.fields.channel[0])
             ),
-            NextState("PHASE3")
+            NextState("PHASE2")
+        ),
+        fsm.act("PHASE2",
+            NextState("PHASE3"),
+            If((cycle >= 4) & (cycle <= 11),
+                NextValue(self.result.fields.data, Cat(cipo, self.result.fields.data[:-1]))
+            ),
         ),
         fsm.act("PHASE3",
             NextValue(sclk, 1),
             NextState("PHASE4"),
         ),
         fsm.act("PHASE4",
+            NextState("PHASE5"),
+        )
+        fsm.act("PHASE5",
             If(cycle < 0xf,
                 NextValue(cycle, cycle + 1),
                 NextState("PHASE0")
-            ).Else(
+               ).Else(
                 NextState("IDLE")
-            ),
-            If((cycle >= 4) & (cycle <= 11),
-                NextValue(self.result.fields.data, Cat(cipo,self.result.fields.data[:-1]))
             ),
         )
 
