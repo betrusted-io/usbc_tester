@@ -155,7 +155,7 @@ class Adc(Module, AutoDoc, AutoCSR):
             CSRField("go", size=1, description="Start the conversion", pulse=True),
         ])
         self.result = CSRStatus(name="result", fields=[
-            CSRField("data", size=8, description="Result of last conversion"),
+            CSRField("data", size=10, description="Result of last conversion"),
             CSRField("running", size=1, description="Conversion is running"),
         ])
         fsm = FSM(reset_state="IDLE")
@@ -206,19 +206,13 @@ class Adc(Module, AutoDoc, AutoCSR):
             NextState("PHASE2")
         ),
         fsm.act("PHASE2",
-            NextState("PHASE3"),
-            If((cycle >= 4) & (cycle <= 11),
+            NextValue(sclk, 1),
+            If((cycle >= 4) & (cycle <= 13),
                 NextValue(self.result.fields.data, Cat(cipo, self.result.fields.data[:-1]))
             ),
+            NextState("PHASE3"),
         ),
         fsm.act("PHASE3",
-            NextValue(sclk, 1),
-            NextState("PHASE4"),
-        ),
-        fsm.act("PHASE4",
-            NextState("PHASE5"),
-        )
-        fsm.act("PHASE5",
             If(cycle < 0xf,
                 NextValue(cycle, cycle + 1),
                 NextState("PHASE0")
