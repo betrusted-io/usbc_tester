@@ -12,7 +12,7 @@ use debug;
 use debug::{log, loghex, loghexln, logln, LL};
 use riscv_rt::entry;
 use utralib::generated::{
-    utra, CSR, HW_CRG_BASE, HW_GIT_BASE, HW_TICKTIMER_BASE,
+    utra, CSR, HW_CRG_BASE, HW_GIT_BASE, HW_TICKTIMER_BASE, HW_DUT_BASE,
 };
 use betrusted_hal::hal_time::{
     get_time_ms, get_time_ticks, set_msleep_target_ticks, time_init, TimeMs,
@@ -24,11 +24,13 @@ use betrusted_hal::mem_locs::*;
 mod spi;
 mod str_buf;
 mod uart;
-use spi::{spi_erase_region, spi_program_page, spi_standby};
 use str_buf::StrBuf;
+mod screen;
+mod sbled;
+mod adc;
 
 // Configure Log Level (used in macro expansions)
-const LOG_LEVEL: LL = LL::Debug;
+const LOG_LEVEL: LL = LL::Info;
 
 // Constants
 const CONFIG_CLOCK_FREQUENCY: u32 = 18_000_000;
@@ -81,7 +83,6 @@ fn main() -> ! {
     logln!(LL::Info, "\r\n====UP5K==0E");
     let mut crg_csr = CSR::new(HW_CRG_BASE as *mut u32);
     let mut ticktimer_csr = CSR::new(HW_TICKTIMER_BASE as *mut u32);
-    let git_csr = CSR::new(HW_GIT_BASE as *mut u32);
     let mut uart_state: uart::RxState = uart::RxState::BypassOnAwaitA;
 
     // Initialize the no-MMU version of 'Xous' (an extremely old branch of it), which will give us
@@ -106,6 +107,16 @@ fn main() -> ! {
     // Drain the UART RX buffer
     uart::drain_rx_buf();
 
+    let mut sbled = sbled::SbLed::new();
+    sbled.idle();
+    let mut screen = screen::Screen {};
+    let mut adc = adc::Adc::new();
+
+    write!(srceen, "#LCK");
+    write!(srceen, "USB C Test Power On");
+    write!(srceen, "#SYN");
+
+    let mut dut_csr = CSR::new(HW_DUT_BASE as *mut u32);
     //////////////////////// MAIN LOOP ------------------
     logln!(LL::Info, "main loop");
     loop {
@@ -148,5 +159,15 @@ fn main() -> ! {
             );
         }
         ///////////////////////////// --------------------------------------
+        ///////////////////////////// TEST LOOP ----------------------------
+        if dut_csr.rf(utra::dut::RUN_RUN) == 0 { // active low switch hit
+            // run the test
+            write!(srceen, "Test run:\n\r");
+            write!(srceen, " \n\r");
+            write!(srceen, "INSERT LOWER\n\r");
+            write!(srceen, "INSERT UPPER\n\r");
+            write!(srceen, "#SYN");
+            
+        }
     }
 }

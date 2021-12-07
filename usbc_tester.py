@@ -30,7 +30,7 @@ from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.csr_eventmanager import *
 from litex.soc.cores.uart import UARTWishboneBridge
 from litex.soc.cores import uart
-
+from rtl import sbled
 
 import litex.soc.doc as lxsocdoc
 
@@ -739,13 +739,16 @@ class BaseSoC(SoCCore):
             pads=screen_pads,
             clk_freq=clk_freq,
             baudrate=9600)
-        self.submodules.uart = ResetInserter()(uart.UART(self.screen_phy,
+        self.submodules.screen = ResetInserter()(uart.UART(self.screen_phy,
         tx_fifo_depth=16,
         rx_fifo_depth=16))
         self.add_csr("screen_phy")
         self.add_csr("screen")
         self.add_interrupt("screen")
 
+        # RGB --------------------------------------------------------------------------------------------
+        self.submodules.sbled = sbled.SBLED(platform.request("led"))
+        self.add_csr("sbled")
 
         #### Platform config & build below ---------------------------------------------------------------
         # Override default LiteX's yosys/build templates
