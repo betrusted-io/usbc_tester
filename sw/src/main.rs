@@ -1,8 +1,6 @@
 #![no_main]
 #![no_std]
 
-// note: to get vscode to reload file, do shift-ctrl-p, 'reload window'. developer:Reload window
-
 extern crate utralib;
 extern crate volatile;
 extern crate xous_nommu;
