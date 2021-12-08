@@ -1,6 +1,7 @@
 use utralib::generated::{
     utra, CSR, HW_SCREEN_BASE,
 };
+use betrusted_hal::hal_time::delay_ms;
 
 /// Flow control timeout limits how long putc() waits to drain a full TX buffer
 const FLOW_CONTROL_TIMEOUT_MS: usize = 5;
@@ -28,7 +29,7 @@ impl Screen {
 }
 
 use core::fmt::{Error, Write};
-impl Write for Uart {
+impl Write for Screen {
     fn write_str(&mut self, s: &str) -> Result<(), Error> {
         for c in s.bytes() {
             Self::putc(c);

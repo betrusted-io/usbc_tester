@@ -12,19 +12,18 @@ use debug;
 use debug::{log, loghex, loghexln, logln, LL};
 use riscv_rt::entry;
 use utralib::generated::{
-    utra, CSR, HW_CRG_BASE, HW_GIT_BASE, HW_TICKTIMER_BASE, HW_DUT_BASE,
+    utra, CSR, HW_CRG_BASE, HW_TICKTIMER_BASE, HW_DUT_BASE,
 };
 use betrusted_hal::hal_time::{
-    get_time_ms, get_time_ticks, set_msleep_target_ticks, time_init, TimeMs,
+    set_msleep_target_ticks, time_init, TimeMs, delay_ms,
 };
-use volatile::Volatile;
 use betrusted_hal::mem_locs::*;
+use core::fmt::Write;
 
 // Modules from this crate
 mod spi;
 mod str_buf;
 mod uart;
-use str_buf::StrBuf;
 mod screen;
 mod sbled;
 mod adc;
@@ -78,6 +77,105 @@ fn stack_check() {
     );
 }
 
+pub const UPPER_PINS: [(utralib::Field, &'static str); 4] = [
+    (utra::dut::DUT_GND_EX, "DUT_GND_EX"),
+    (utra::dut::DUT_VBUS_EX, "DUT_VBUS_EX"),
+    (utra::dut::DUT_D2_P_A6, "D_P: Pin B7"),
+    (utra::dut::DUT_D2_N_A7, "D_N: Pin B6"),
+];
+pub const LOWER_PINS: [(utralib::Field, &'static str); 12] = [
+    (utra::dut::DUT_GND_B12, "GND: Pin B12"),
+    (utra::dut::DUT_VBUS_B9, "VBUS: Pin B9"),
+    (utra::dut::DUT_CC2_B5, "CC2: Pin B5"),
+    (utra::dut::DUT_GND_B1, "GND: Pin B1"),
+    (utra::dut::DUT_GND_A1, "GND: Pin A1"),
+    (utra::dut::DUT_VBUS_A4, "VBUS: Pin A4"),
+    (utra::dut::DUT_CC1_A5, "CC1: Pin A5"),
+    (utra::dut::DUT_VBUS_A9, "VBUS: Pin A9"),
+    (utra::dut::DUT_D1_P_A6, "D_P: Pin A6"),
+    (utra::dut::DUT_D1_N_A7, "D_N: Pin A7"),
+    (utra::dut::DUT_GND_A12, "GND: Pin A12"),
+    (utra::dut::DUT_VBUS_B4, "VBUS: Pin B4"),
+];
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum PinBank {
+    Upper,
+    Lower
+}
+
+/// anything above this number is considered to be an "open" pin
+const MIN_NC_THRESH: u16 = 1000;
+
+/// Checks a pin bank.
+/// 1. checks to see if any pins are connected. If are connected, return None
+/// 2. if any show some kind of connectivity, returns Some([Option<&str>; 12]), where
+///    an entry is Some(&str) to represent a failing pin, or None if things pass.
+fn check_pins(bank: PinBank) -> [(Option<&'static str>, u16); 12] {
+    let mut adc = adc::Adc::new();
+    // pick the iterator through the bank descriptor array that matches the requested bank
+    let bank_iter = match bank {
+        PinBank::Lower => {
+            LOWER_PINS.iter()
+        }
+        PinBank::Upper => {
+            UPPER_PINS.iter()
+        }
+    };
+    let mut results: [(Option<&'static str>, u16); 12] = [(None, u16::MAX); 12];
+    for (index, &(field, name)) in bank_iter.enumerate() {
+        let reading = match adc.read(field) {
+            Some(r) => r,
+            None => {
+                // cheeseball errors because we don't have a panic handler
+                logln!(LL::Error, "ADC channel invalid");
+                u16::MAX
+            }
+        };
+        results[index] = (Some(name), reading);
+    }
+    results
+}
+
+/// Convenience function that just scans a bank and indicatse if an insertion was detected.
+fn check_insert(bank: PinBank) -> bool {
+    let result = check_pins(bank);
+    for (_name, val) in result {
+        if val < MIN_NC_THRESH {
+            return true;
+        }
+    }
+    false
+}
+
+fn settling_check(bank: PinBank) -> [bool; 12] {
+    let result = check_pins(bank);
+    let mut ret = [false; 12];
+    for (index, &(_name, val)) in result.iter().enumerate() {
+        if val < MIN_NC_THRESH {
+            ret[index] = true;
+        } else {
+            ret[index] = false;
+        }
+    }
+    ret
+}
+fn results_equal(a: [bool; 12], b: [bool; 12]) -> bool {
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        if x != y {
+            return false
+        }
+    }
+    true
+}
+
+#[derive(PartialEq, Eq)]
+enum TestState {
+    WaitInsert,
+    Measure,
+    ReportResult,
+}
+
 #[entry]
 fn main() -> ! {
     logln!(LL::Info, "\r\n====UP5K==0E");
@@ -110,13 +208,12 @@ fn main() -> ! {
     let mut sbled = sbled::SbLed::new();
     sbled.idle();
     let mut screen = screen::Screen {};
-    let mut adc = adc::Adc::new();
 
-    write!(srceen, "#LCK");
-    write!(srceen, "USB C Test Power On");
-    write!(srceen, "#SYN");
+    write!(screen, "#LCK").unwrap();
+    write!(screen, "USB C Test Power On").unwrap();
+    write!(screen, "#SYN").unwrap();
 
-    let mut dut_csr = CSR::new(HW_DUT_BASE as *mut u32);
+    let dut_csr = CSR::new(HW_DUT_BASE as *mut u32);
     //////////////////////// MAIN LOOP ------------------
     logln!(LL::Info, "main loop");
     loop {
@@ -161,13 +258,158 @@ fn main() -> ! {
         ///////////////////////////// --------------------------------------
         ///////////////////////////// TEST LOOP ----------------------------
         if dut_csr.rf(utra::dut::RUN_RUN) == 0 { // active low switch hit
-            // run the test
-            write!(srceen, "Test run:\n\r");
-            write!(srceen, " \n\r");
-            write!(srceen, "INSERT LOWER\n\r");
-            write!(srceen, "INSERT UPPER\n\r");
-            write!(srceen, "#SYN");
-            
+            delay_ms(10); // wait for the switch to debounce
+            while dut_csr.rf(utra::dut::RUN_RUN) == 0 { // wait for the switch to rise
+                delay_ms(10);
+            }
+            delay_ms(10); // another debounce period
+            sbled.run();
+
+            // test at least twice because we need to debounce the insertion
+            let mut test_state = TestState::WaitInsert;
+            let mut stabilize = 0;
+            let mut last_result = [false; 12];
+            let mut lower_result: [(Option<&'static str>, u16); 12] = [(None, u16::MAX); 12];
+            let mut lower_finished = false;
+            let mut upper_result: [(Option<&'static str>, u16); 12] = [(None, u16::MAX); 12];
+            let mut upper_finished = false;
+            let mut bank = PinBank::Lower;
+            let mut counter = 0;
+            logln!(LL::Info, "test start");
+            loop {
+                if dut_csr.rf(utra::dut::RUN_RUN) == 0 { // active low switch hit exits the test
+                    delay_ms(10); // wait for the switch to debounce
+                    while dut_csr.rf(utra::dut::RUN_RUN) == 0 { // wait for the switch to rise
+                        delay_ms(10);
+                    }
+                    delay_ms(10);
+                    sbled.idle();
+                    logln!(LL::Info, "test exit");
+                    break; // exit the loop
+                }
+                match test_state {
+                    TestState::WaitInsert => {
+                        counter = 0;
+                        stabilize = 0;
+                        if upper_finished && lower_finished {
+                            logln!(LL::Info, "show result");
+                            test_state = TestState::ReportResult;
+                            continue;
+                        }
+                        write!(screen, "    *Test running*\n\r").unwrap();
+                        if !upper_finished {
+                            write!(screen, "INSERT UPPER\n\r").unwrap();
+                        } else {
+                            write!(screen, "Upper measured.\n\r").unwrap();
+                        }
+                        write!(screen, " \n\r").unwrap();
+                        if !lower_finished {
+                            write!(screen, "INSERT LOWER\n\r").unwrap();
+                        } else {
+                            write!(screen, "Lower measured.\n\r").unwrap();
+                        }
+                        write!(screen, " \n\r").unwrap();
+                        write!(screen, "#SYN").unwrap();
+                        if !lower_finished && check_insert(PinBank::Lower) {
+                            logln!(LL::Info, "measure lower");
+                            test_state = TestState::Measure;
+                            bank = PinBank::Lower;
+                            continue;
+                        }
+                        if !upper_finished && check_insert(PinBank::Upper) {
+                            logln!(LL::Info, "measure upper");
+                            test_state = TestState::Measure;
+                            bank = PinBank::Upper;
+                            continue;
+                        }
+                    }
+                    TestState::Measure => {
+                        if bank == PinBank::Lower {
+                            write!(screen, "Measuring lower...\n\r").unwrap();
+                        } else {
+                            write!(screen, "Measuring upper...\n\r").unwrap();
+                        }
+                        write!(screen, " \n\r").unwrap();
+                        match counter % 4 {
+                            0 => write!(screen, " |  |  |  | \n\r").unwrap(),
+                            1 => write!(screen, " /  /  /  / \n\r").unwrap(),
+                            2 => write!(screen, " -  -  -  - \n\r").unwrap(),
+                            _ => write!(screen, " \\  \\  \\  \\ \n\r").unwrap(),
+                        };
+                        write!(screen, " \n\r").unwrap();
+                        write!(screen, " \n\r").unwrap();
+                        write!(screen, "#SYN").unwrap();
+                        counter += 1;
+                        let new_result = settling_check(PinBank::Lower);
+                        if results_equal(new_result, last_result) {
+                            stabilize += 1;
+                        } else {
+                            stabilize = 0;
+                        }
+                        for (&src, dst) in new_result.iter().zip(last_result.iter_mut()) {*dst = src;}
+                        if stabilize == 4 {
+                            if bank == PinBank::Lower {
+                                lower_result = check_pins(PinBank::Lower);
+                                lower_finished = true;
+                                test_state = TestState::WaitInsert;
+                            } else {
+                                upper_result = check_pins(PinBank::Upper);
+                                upper_finished = true;
+                                test_state = TestState::WaitInsert;
+                            }
+                        }
+                    }
+                    TestState::ReportResult => {
+                        let mut passing = true;
+                        let mut total_fail = 0;
+                        for (_name, val) in lower_result {
+                            if val > MIN_NC_THRESH {
+                                passing = false;
+                                total_fail += 1;
+                            }
+                        }
+                        for (_name, val) in upper_result {
+                            if val > MIN_NC_THRESH {
+                                passing = false;
+                                total_fail += 1;
+                            }
+                        }
+                        if passing {
+                            sbled.pass();
+                            write!(screen, "   PASS PASS PASS\n\r").unwrap();
+                            write!(screen, " \n\r").unwrap();
+                            write!(screen, "Remove DUT and press\n\r").unwrap();
+                            write!(screen, "start to test another.\n\r").unwrap();
+                            write!(screen, "   PASS PASS PASS\n\r").unwrap();
+                            write!(screen, "#SYN").unwrap();
+                        } else {
+                            sbled.fail();
+                            write!(screen, "!!! FAIL: {} PINS !!!\n\r", total_fail).unwrap();
+                            let mut lines = 0;
+                            for (maybe_name, val) in lower_result {
+                                if let Some(name) = maybe_name {
+                                    if val >= MIN_NC_THRESH {
+                                        if lines < 5 {
+                                            write!(screen, " {}", name).unwrap();
+                                            lines += 1;
+                                        }
+                                    }
+                                }
+                            }
+                            for (maybe_name, val) in upper_result {
+                                if let Some(name) = maybe_name {
+                                    if val >= MIN_NC_THRESH {
+                                        if lines < 5 {
+                                            write!(screen, " {}", name).unwrap();
+                                            lines += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

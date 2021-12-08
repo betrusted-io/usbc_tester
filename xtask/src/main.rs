@@ -10,10 +10,9 @@ use const_format::formatcp;
 type DynError = Box<dyn std::error::Error>;
 
 const TARGET: &str = "riscv32imc-unknown-none-elf";
-const IMAGE_PATH: &'static str = formatcp!("target/{}/release/usbc_tester.bin", TARGET);
-const DEST_FILE: &'static str = formatcp!("usbc_tester.bin");
+const IMAGE_PATH: &'static str = formatcp!("target/{}/release/usbc_img.bin", TARGET);
+const DEST_FILE: &'static str = formatcp!("usbc_img.bin");
 const DESTDIR: &'static str = "code/precursors/";
-const UPDATE_EC: &'static str = "precursors/usbc_tester.bin";
 
 fn main() {
     if let Err(e) = try_main() {
@@ -97,7 +96,6 @@ fn push_to_pi(target: Option<String>, id: Option<String>) -> Result<(), DynError
     let dest_str = DESTDIR.to_string() + DEST_FILE;
     let dest = Path::new(&dest_str);
     scp(&target_str.clone(), "pi", id.clone(), Path::new(&IMAGE_PATH), &dest);
-    scp(&target_str.clone(), "pi", id.clone(), Path::new(&UPDATE_EC), Path::new(&(DESTDIR.to_string() + "usbc_tester.bin")));
 
     let dest_str = DESTDIR.to_string() + "usbc_tester_csr.csv";
     let dest = Path::new(&dest_str);
@@ -295,27 +293,6 @@ fn create_image(
     image.write(&gateware_bin)?;
     image.write(&loader)?;
     image.write(&kernel_bin)?;
-
-    let mut ec_fw: Vec<u8> = Vec::new();
-    // build the header
-    ec_fw.write(&[0; 32])?; // pad some space for the hash
-    ec_fw.write(&[0x70, 0x72, 0x65, 0x63])?; // signature 'prec' in BE
-    ec_fw.write(&(1 as u32).to_le_bytes())?;
-    ec_fw.write( &((gateware_bin.len() + loader.len() + kernel_bin.len()) as u32).to_le_bytes())?;
-    ec_fw.resize(4096, 0xff); // extend the header to the next page
-    // write the firmware
-    ec_fw.write(&gateware_bin)?;
-    ec_fw.write(&loader)?;
-    ec_fw.write(&kernel_bin)?;
-    // compute the hash
-    use sha2::Digest;
-    let mut hasher = sha2::Sha512Trunc256::new();
-    hasher.update(&ec_fw[32..]);
-    let result = hasher.finalize();
-    ec_fw[..32].clone_from_slice(&result);
-    // output the final image
-    let mut ec_fw_file = std::fs::File::create(PathBuf::from(UPDATE_EC))?;
-    ec_fw_file.write(&ec_fw)?;
 
     Ok(project_root().join(&IMAGE_PATH))
 }

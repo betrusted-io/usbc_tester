@@ -1,3 +1,5 @@
+
+#![allow(dead_code)]
 use convert_case::{Case, Casing};
 use quick_xml::events::Event;
 use quick_xml::Reader;
@@ -480,7 +482,7 @@ fn print_header<U: Write>(out: &mut U) -> std::io::Result<()> {
 #![allow(dead_code)]
 use core::convert::TryInto;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Register {
     /// Offset of this register within this CSR
     offset: usize,
@@ -492,7 +494,7 @@ impl Register {
         Register { offset, mask }
     }
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Field {
     /// A bitmask we use to AND to the value, unshifted.
     /// E.g. for a width of `3` bits, this mask would be 0b111.
