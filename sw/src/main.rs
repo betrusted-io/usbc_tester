@@ -27,7 +27,7 @@ mod sbled;
 mod adc;
 
 // Configure Log Level (used in macro expansions)
-const LOG_LEVEL: LL = LL::Info;
+const LOG_LEVEL: LL = LL::Trace;
 
 // Constants
 const CONFIG_CLOCK_FREQUENCY: u32 = 18_000_000;
@@ -76,7 +76,7 @@ fn stack_check() {
 }
 
 pub const UPPER_PINS: [(utralib::Field, &'static str); 4] = [
-    (utra::dut::DUT_GND_EX, "DUT_GND_EX"),
+    (utra::dut::DUT_IBUS, "DUT_IBUS"),
     (utra::dut::DUT_VBUS_EX, "DUT_VBUS_EX"),
     (utra::dut::DUT_D2_P_A6, "D_P: Pin B7"),
     (utra::dut::DUT_D2_N_A7, "D_N: Pin B6"),
@@ -102,8 +102,8 @@ enum PinBank {
     Lower
 }
 
-/// anything above this number is considered to be an "open" pin
-const MIN_NC_THRESH: u16 = 1000;
+/// anything delta less than this is considered to be an "open pin"
+const MIN_NC_THRESH: u16 = 32;
 
 /// Checks a pin bank.
 /// 1. checks to see if any pins are connected. If are connected, return None
@@ -120,6 +120,10 @@ fn check_pins(bank: PinBank) -> [(Option<&'static str>, u16); 12] {
             UPPER_PINS.iter()
         }
     };
+    let bankstr = match bank {
+        PinBank::Lower => "L: ",
+        PinBank::Upper => "H: ",
+    };
     let mut results: [(Option<&'static str>, u16); 12] = [(None, u16::MAX); 12];
     for (index, &(field, name)) in bank_iter.enumerate() {
         let reading = match adc.read(field) {
@@ -130,6 +134,7 @@ fn check_pins(bank: PinBank) -> [(Option<&'static str>, u16); 12] {
                 u16::MAX
             }
         };
+        logln!(LL::Info, "{}{} - {}", bankstr, name, reading);
         results[index] = (Some(name), reading);
     }
     results
@@ -179,7 +184,6 @@ fn main() -> ! {
     logln!(LL::Info, "\r\n====UP5K==00");
     let mut crg_csr = CSR::new(HW_CRG_BASE as *mut u32);
     let mut ticktimer_csr = CSR::new(HW_TICKTIMER_BASE as *mut u32);
-    let mut uart_state: uart::RxState = uart::RxState::BypassOnAwaitA;
 
     // Initialize the no-MMU version of 'Xous' (an extremely old branch of it), which will give us
     // basic access to tasks and interrupts.
@@ -207,9 +211,13 @@ fn main() -> ! {
     sbled.idle();
     let mut screen = screen::Screen {};
 
-    write!(screen, "#LCK").unwrap();
-    write!(screen, "USB C Test Power On").unwrap();
-    write!(screen, "#SYN").unwrap();
+    logln!(LL::Info, "Ready, waiting for screen to come up...");
+
+    delay_ms(2000); // wait for the screen to boot
+
+    write!(screen, "#LCK\n\r").unwrap();
+    write!(screen, "USB Test Power On\n\r").unwrap();
+    write!(screen, "#SYN\n\r").unwrap();
 
     let dut_csr = CSR::new(HW_DUT_BASE as *mut u32);
     //////////////////////// MAIN LOOP ------------------
@@ -219,15 +227,10 @@ fn main() -> ! {
         // Uart starts in bypass mode, so this won't start returning bytes
         // until after it sees the "AT\n" wake sequence (or "AT\r")
         let mut show_help = false;
+        let mut uart_state: uart::RxState = uart::RxState::BypassOff;
         if let Some(b) = uart::rx_byte(&mut uart_state) {
+            logln!(LL::Info, "{}", b);
             match b {
-                0x1B => {
-                    // In case of ANSI escape sequences (arrow keys, etc.) turn UART bypass mode
-                    // on to avoid the hassle of having to parse the escape sequences or deal
-                    // with whatever unintended commands they might accidentally trigger
-                    uart_state = uart::RxState::BypassOnAwaitA;
-                    logln!(LL::Debug, "UartRx off");
-                }
                 b'h' | b'H' | b'?' => show_help = true,
                 b'5' => {
                     let now = TimeMs::now();
@@ -235,11 +238,24 @@ fn main() -> ! {
                     loghexln!(LL::Debug, " ", now.ms_low_word());
                 }
                 b'6' => stack_check(),
+                b't' => {
+                    let mut adc = adc::Adc::new();
+                    let mut ch = 0;
+                    loop {
+                        //loghexln!(LL::Info, " ", adc.read(utra::dut::DUT_GND_A12).unwrap());
+                        //loghexln!(LL::Info, " ", adc.read(utra::dut::DUT_IBUS).unwrap());
+                        loghex!(LL::Info, "ch: ", ch);
+                        loghexln!(LL::Info, " ", adc.read_inner(ch));
+                        ch += 1;
+                        if ch == 16 {
+                            ch = 0;
+                        }
+                    }
+                },
                 _ => (),
             }
         } else if uart_state == uart::RxState::Waking {
             logln!(LL::Debug, "UartRx on");
-            uart_state = uart::RxState::BypassOff;
             show_help = true;
         }
         if show_help {
@@ -307,7 +323,7 @@ fn main() -> ! {
                             write!(screen, "Lower measured.\n\r").unwrap();
                         }
                         write!(screen, " \n\r").unwrap();
-                        write!(screen, "#SYN").unwrap();
+                        write!(screen, "#SYN\n\r").unwrap();
                         if !lower_finished && check_insert(PinBank::Lower) {
                             logln!(LL::Info, "measure lower");
                             test_state = TestState::Measure;
@@ -336,7 +352,7 @@ fn main() -> ! {
                         };
                         write!(screen, " \n\r").unwrap();
                         write!(screen, " \n\r").unwrap();
-                        write!(screen, "#SYN").unwrap();
+                        write!(screen, "#SYN\n\r").unwrap();
                         counter += 1;
                         let new_result = settling_check(PinBank::Lower);
                         if results_equal(new_result, last_result) {
@@ -379,7 +395,7 @@ fn main() -> ! {
                             write!(screen, "Remove DUT and press\n\r").unwrap();
                             write!(screen, "start to test another.\n\r").unwrap();
                             write!(screen, "   PASS PASS PASS\n\r").unwrap();
-                            write!(screen, "#SYN").unwrap();
+                            write!(screen, "#SYN\n\r").unwrap();
                         } else {
                             sbled.fail();
                             write!(screen, "!!! FAIL: {} PINS !!!\n\r", total_fail).unwrap();
@@ -388,7 +404,7 @@ fn main() -> ! {
                                 if let Some(name) = maybe_name {
                                     if val >= MIN_NC_THRESH {
                                         if lines < 5 {
-                                            write!(screen, " {}", name).unwrap();
+                                            write!(screen, " {}\n\r", name).unwrap();
                                             lines += 1;
                                         }
                                     }
@@ -398,7 +414,7 @@ fn main() -> ! {
                                 if let Some(name) = maybe_name {
                                     if val >= MIN_NC_THRESH {
                                         if lines < 5 {
-                                            write!(screen, " {}", name).unwrap();
+                                            write!(screen, " {}\n\r", name).unwrap();
                                             lines += 1;
                                         }
                                     }

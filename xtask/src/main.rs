@@ -91,7 +91,7 @@ fn push_to_pi(target: Option<String>, id: Option<String>) -> Result<(), DynError
     let mut image_file = std::fs::File::open(IMAGE_PATH)?;
     image_file.read_to_end(&mut image_vec)?;
     let digest_image = md5::compute(&image_vec);
-    print!("bt-ec.bin: {}\n", format!("{:x}", digest_image));
+    print!("usbc_img.bin: {}\n", format!("{:x}", digest_image));
 
     let dest_str = DESTDIR.to_string() + DEST_FILE;
     let dest = Path::new(&dest_str);

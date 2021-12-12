@@ -85,7 +85,7 @@ io = [
      Subsignal("d2_p_a6", Pins("32"), IOStandard("LVCMOS33")),
      Subsignal("d2_n_a7", Pins("36"), IOStandard("LVCMOS33")),
      Subsignal("vbus_ex", Pins("34"), IOStandard("LVCMOS33")),
-     Subsignal("gnd_ex",  Pins("31"), IOStandard("LVCMOS33")),
+     Subsignal("ibus",  Pins("31"), IOStandard("LVCMOS33")),
      Subsignal("gnd_b12", Pins("47"), IOStandard("LVCMOS33")),
      Subsignal("vbus_b9", Pins("10"), IOStandard("LVCMOS33")),
      Subsignal("cc2_b5",  Pins("9"), IOStandard("LVCMOS33")),
@@ -118,7 +118,7 @@ class Dut(Module, AutoDoc, AutoCSR):
             "d2_p_a6",
             "d2_n_a7",
             "vbus_ex",
-            "gnd_ex",
+            "ibus",
             "gnd_b12",
             "vbus_b9",
             "cc2_b5",
@@ -156,7 +156,7 @@ class Adc(Module, AutoDoc, AutoCSR):
         ])
         self.result = CSRStatus(name="result", fields=[
             CSRField("data", size=10, description="Result of last conversion"),
-            CSRField("running", size=1, description="Conversion is running"),
+            CSRField("done", size=1, description="Conversion is done. Cleared on read."),
         ])
         fsm = FSM(reset_state="IDLE")
         self.submodules += fsm
@@ -172,14 +172,22 @@ class Adc(Module, AutoDoc, AutoCSR):
             pads.cs1_n.eq(cs_n[1])
         ]
         cycle = Signal(4)
-        run = Signal()
-        self.comb += self.result.fields.running.eq(run | self.ctrl.fields.go)
+        done = Signal()
+        self.sync += [
+            If(self.result.we,
+                self.result.fields.done.eq(0)
+            ).Elif(done,
+                self.result.fields.done.eq(1)
+            ).Else(
+                self.result.fields.done.eq(self.result.fields.done)
+            )
+        ]
         fsm.act("IDLE",
             NextValue(sclk, 1),
             NextValue(copi, 0),
             NextValue(cycle, 0),
+            NextValue(done, 0),
             If(self.ctrl.fields.go,
-                NextValue(run, 1),
                 NextState("PHASE0"),
                 If(self.ctrl.fields.channel[3] == 0,
                     NextValue(cs_n, 0b10)
@@ -187,7 +195,6 @@ class Adc(Module, AutoDoc, AutoCSR):
                     NextValue(cs_n, 0b01)
                 )
             ).Else(
-                NextValue(run, 0),
                 NextValue(cs_n, 0b11),
             )
         )
@@ -217,7 +224,8 @@ class Adc(Module, AutoDoc, AutoCSR):
                 NextValue(cycle, cycle + 1),
                 NextState("PHASE0")
                ).Else(
-                NextState("IDLE")
+                NextState("IDLE"),
+                NextValue(done, 1),
             ),
         )
 

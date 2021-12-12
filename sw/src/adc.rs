@@ -1,6 +1,11 @@
 use utralib::generated::{
-    utra, CSR, HW_DUT_BASE,
+    utra, CSR, HW_DUT_BASE, HW_ADC_BASE,
 };
+use betrusted_hal::hal_time::delay_ms;
+
+use debug;
+use debug::{loghexln, LL};
+use crate::LOG_LEVEL;
 
 // the index in this map corresponds to the ADC channel for a given DUT enable
 pub const CHANNEL_MAP: [utralib::Field; 16] = [
@@ -15,25 +20,50 @@ pub const CHANNEL_MAP: [utralib::Field; 16] = [
     utra::dut::DUT_D2_N_A7, // actually B7 (on upper/reverse conn)
     utra::dut::DUT_D2_P_A6, // actually B6 (on upper/reverse conn)
     utra::dut::DUT_VBUS_EX,
-    utra::dut::DUT_GND_EX,
+    utra::dut::DUT_IBUS,
     utra::dut::DUT_GND_A1,
     utra::dut::DUT_VBUS_A9,
     utra::dut::DUT_VBUS_A4,
     utra::dut::DUT_CC1_A5,
 ];
 pub struct Adc {
-    csr: CSR::<u32>,
+    adc: CSR::<u32>,
+    dut: CSR::<u32>,
 }
 
 impl Adc {
     pub fn new() -> Adc {
-        let csr = CSR::new(HW_DUT_BASE as *mut u32);
+        let adc = CSR::new(HW_ADC_BASE as *mut u32);
+        let mut dut = CSR::new(HW_DUT_BASE as *mut u32);
+        // set the mux to 0
+        dut.wo(utra::dut::DUT, 0);
         Adc {
-            csr,
+            adc,
+            dut,
         }
     }
-    /// given an ADC channel, return the code on the channel
+    pub fn read_inner(&mut self, ch: u32) -> u16 {
+        // first one specifies the channel
+        self.adc.wo(utra::adc::CONTROL,
+            self.adc.ms(utra::adc::CONTROL_CHANNEL, ch as u32) |
+            self.adc.ms(utra::adc::CONTROL_GO, 1)
+        );
+        while self.adc.rf(utra::adc::RESULT_DONE) == 0 {
+            // busy wait
+        }
+        // second one gets the actual channel, due to the pipelining
+        self.adc.wo(utra::adc::CONTROL,
+            self.adc.ms(utra::adc::CONTROL_CHANNEL, ch as u32) |
+            self.adc.ms(utra::adc::CONTROL_GO, 1)
+        );
+        while self.adc.rf(utra::adc::RESULT_DONE) == 0 {
+            // busy wait
+        }
+        self.adc.rf(utra::adc::RESULT_DATA) as u16
+    }
+    /// given an ADC channel, return the delta of the reading versus the calibration
     pub fn read(&mut self, channel: utralib::Field) -> Option<u16> {
+        // convert the GPIO field selector into an ADC channel number
         let mut ch = 16;
         for (index, &field) in CHANNEL_MAP.iter().enumerate() {
             if field == channel {
@@ -45,13 +75,28 @@ impl Adc {
         if ch == 16 {
             return None
         }
-        self.csr.wo(utra::adc::CONTROL,
-            self.csr.ms(utra::adc::CONTROL_CHANNEL, ch as u32) |
-            self.csr.ms(utra::adc::CONTROL_GO, 1)
-        );
-        while self.csr.rf(utra::adc::RESULT_RUNNING) == 1 {
-            // busy wait
+
+        // get the ibus cal value; no measurement values should be muxed at this point
+        // set the mux to 0
+        self.dut.wo(utra::dut::DUT, 0);
+        delay_ms(2);
+        let cal = self.read_inner(3 + 8);
+
+        // mux in the DUT measurement channel
+        self.dut.wfo(channel, 1);
+        delay_ms(2);
+        let meas = self.read_inner(ch as u32);
+        // set the mux to 0
+        self.dut.wo(utra::dut::DUT, 0);
+
+        loghexln!(LL::Info, " cal: ", cal);
+        loghexln!(LL::Info, "meas: ", meas);
+        loghexln!(LL::Info, "  ch: ", ch);
+
+        if meas >= cal {
+            Some(0)
+        } else {
+            Some(cal - meas)
         }
-        Some(self.csr.rf(utra::adc::RESULT_DATA) as u16)
     }
 }

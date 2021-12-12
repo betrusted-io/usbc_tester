@@ -26,7 +26,9 @@ impl SbLed {
             utra::sbled::CTRL,
             csr.ms(utra::sbled::CTRL_CURREN, 1) |
             csr.ms(utra::sbled::CTRL_RGBLEDEN, 1) |
-            csr.ms(utra::sbled::CTRL_EXE, 1)
+            csr.ms(utra::sbled::CTRL_EXE, 1) |
+            csr.ms(utra::sbled::CTRL_GRAW, 1) |
+            csr.ms(utra::sbled::CTRL_BRAW, 1)
         );
 
         // setup the PWM IP
@@ -37,13 +39,13 @@ impl SbLed {
         csr.wfo(utra::sbled::ADDR_ADDR, LEDDBR);
         csr.wfo(utra::sbled::DAT_DAT, (CONFIG_CLOCK_FREQUENCY / 64000) - 1);
 
-        // on time to 0.25 second
+        // on time to 1.024 second
         csr.wfo(utra::sbled::ADDR_ADDR, LEDDONR);
-        csr.wfo(utra::sbled::DAT_DAT, 0b0010_1000);
+        csr.wfo(utra::sbled::DAT_DAT, 0b0100_0000);
 
-        // off time to 0.25 second
+        // off time to 1.024 second
         csr.wfo(utra::sbled::ADDR_ADDR, LEDDOFR);
-        csr.wfo(utra::sbled::DAT_DAT, 0b0010_1000);
+        csr.wfo(utra::sbled::DAT_DAT, 0b0100_0000);
 
         // LED breathe ON, 0.768 ramp time
         csr.wfo(utra::sbled::ADDR_ADDR, LEDDBCRR);
@@ -57,9 +59,9 @@ impl SbLed {
         csr.wfo(utra::sbled::ADDR_ADDR, LEDDPWRR_WHT);
         csr.wfo(utra::sbled::DAT_DAT, 0xff);
         csr.wfo(utra::sbled::ADDR_ADDR, LEDDPWRG_RED);
-        csr.wfo(utra::sbled::DAT_DAT, 0);
+        csr.wfo(utra::sbled::DAT_DAT, 0x0);
         csr.wfo(utra::sbled::ADDR_ADDR, LEDDPWRB_GRN);
-        csr.wfo(utra::sbled::DAT_DAT, 0);
+        csr.wfo(utra::sbled::DAT_DAT, 0x0);
 
         SbLed {
             csr,
@@ -72,32 +74,34 @@ impl SbLed {
             utra::sbled::CTRL,
             self.csr.ms(utra::sbled::CTRL_CURREN, 1) |
             self.csr.ms(utra::sbled::CTRL_RGBLEDEN, 1) |
-            self.csr.ms(utra::sbled::CTRL_EXE, 1)
+            self.csr.ms(utra::sbled::CTRL_EXE, 1) |
+            self.csr.ms(utra::sbled::CTRL_GRAW, 1) |
+            self.csr.ms(utra::sbled::CTRL_BRAW, 1)
         );
 
-        // on time to 0.25 second
+        // on time to 1.024 second
         self.csr.wfo(utra::sbled::ADDR_ADDR, LEDDONR);
-        self.csr.wfo(utra::sbled::DAT_DAT, 0b0010_1000);
+        self.csr.wfo(utra::sbled::DAT_DAT, 0b0100_0000);
 
-        // off time to 0.25 second
-        self.csr.wfo(utra::sbled::ADDR_ADDR, LEDDONR);
-        self.csr.wfo(utra::sbled::DAT_DAT, 0b0010_1000);
+        // off time to 1.024 second
+        self.csr.wfo(utra::sbled::ADDR_ADDR, LEDDOFR);
+        self.csr.wfo(utra::sbled::DAT_DAT, 0b0100_0000);
 
-        // LED breathe ON, 0.768 ramp time
+        // LED breathe ON, 0.896 ramp time
         self.csr.wfo(utra::sbled::ADDR_ADDR, LEDDBCRR);
-        self.csr.wfo(utra::sbled::DAT_DAT, 0b1010_0101);
+        self.csr.wfo(utra::sbled::DAT_DAT, 0b1010_0110);
 
-        // LED breathe ON, 0.768 ramp time
+        // LED breathe ON, 0.896 ramp time
         self.csr.wfo(utra::sbled::ADDR_ADDR, LEDDBCFR);
-        self.csr.wfo(utra::sbled::DAT_DAT, 0b1010_0101);
+        self.csr.wfo(utra::sbled::DAT_DAT, 0b1010_0110);
 
         // turn on the white LED (mapped to the "red" register)
         self.csr.wfo(utra::sbled::ADDR_ADDR, LEDDPWRR_WHT);
         self.csr.wfo(utra::sbled::DAT_DAT, 0xff);
         self.csr.wfo(utra::sbled::ADDR_ADDR, LEDDPWRG_RED);
-        self.csr.wfo(utra::sbled::DAT_DAT, 0);
+        self.csr.wfo(utra::sbled::DAT_DAT, 0x0);
         self.csr.wfo(utra::sbled::ADDR_ADDR, LEDDPWRB_GRN);
-        self.csr.wfo(utra::sbled::DAT_DAT, 0);
+        self.csr.wfo(utra::sbled::DAT_DAT, 0x0);
     }
 
     pub fn pass(&mut self) {

@@ -3,7 +3,7 @@
 <device schemaVersion="1.1" xmlns:xs="http://www.w3.org/2001/XMLSchema-instance" xs:noNamespaceSchemaLocation="CMSIS-SVD.xsd" >
     <vendor>litex</vendor>
     <name>SOC</name>
-    <description><![CDATA[Litex SoC 2021-12-07 22:08:53]]></description>
+    <description><![CDATA[Litex SoC 2021-12-12 17:40:48]]></description>
 
     <addressUnitBits>8</addressUnitBits>
     <width>32</width>
@@ -57,10 +57,10 @@ Notably, a watchdog reset will disable the watchdog.]]></description>
                 <register>
                     <name>GITREV</name>
                     <description><![CDATA[First 32-bits of the git revision.  This documentation was built from git rev
-``54ec6f3b``, so this value is 1424781115, which should be enough to check out
+``eefc1b9b``, so this value is 4009499547, which should be enough to check out
 the exact git version used to build this firmware.]]></description>
                     <addressOffset>0x0000</addressOffset>
-                    <resetValue>0x54ec6f3b</resetValue>
+                    <resetValue>0xeefc1b9b</resetValue>
                     <size>32</size>
                     <fields>
                         <field>
@@ -512,11 +512,11 @@ register to disable individual events.]]></description>
                             <description><![CDATA[Set to connect vbus_ex to test source]]></description>
                         </field>
                         <field>
-                            <name>gnd_ex</name>
+                            <name>ibus</name>
                             <msb>3</msb>
                             <bitRange>[3:3]</bitRange>
                             <lsb>3</lsb>
-                            <description><![CDATA[Set to connect gnd_ex to test source]]></description>
+                            <description><![CDATA[Set to connect ibus to test source]]></description>
                         </field>
                         <field>
                             <name>gnd_b12</name>
@@ -667,11 +667,11 @@ register to disable individual events.]]></description>
                             <description><![CDATA[Result of last conversion]]></description>
                         </field>
                         <field>
-                            <name>running</name>
+                            <name>done</name>
                             <msb>10</msb>
                             <bitRange>[10:10]</bitRange>
                             <lsb>10</lsb>
-                            <description><![CDATA[Conversion is running]]></description>
+                            <description><![CDATA[Conversion is done. Cleared on read.]]></description>
                         </field>
                     </fields>
                 </register>
