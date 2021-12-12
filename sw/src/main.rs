@@ -103,7 +103,7 @@ enum PinBank {
 }
 
 /// anything delta less than this is considered to be an "open pin"
-const MIN_NC_THRESH: u16 = 64;
+const MIN_NC_THRESH: u16 = 80;
 
 /// Checks a pin bank.
 /// 1. checks to see if any pins are connected. If are connected, return None
@@ -376,7 +376,7 @@ fn main() -> ! {
                             stabilize = 0;
                         }
                         for (&src, dst) in new_result.iter().zip(last_result.iter_mut()) {*dst = src;}
-                        if stabilize == 4 {
+                        if stabilize == 6 {
                             if bank == PinBank::Lower {
                                 lower_result = check_pins(PinBank::Lower);
                                 lower_finished = true;
