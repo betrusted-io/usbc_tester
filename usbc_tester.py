@@ -146,6 +146,108 @@ class Dut(Module, AutoDoc, AutoCSR):
         self.run = CSRStatus(1, name="run", description="Pulled low when the `run` switch is depressed")
         self.comb += self.run.status.eq(run_pad)
 
+# ADC (continuous sampling) ----------------------------------------------------------------------------
+class AdcContinuous(Module, AutoDoc, AutoCSR):
+    def __init__(self, pads):
+        self.intro = ModuleDoc("""ADC interface""")
+        self.ctrl = CSRStorage(name="control", fields=[
+            CSRField("channel", size=4, description="Select the ADC channel"),
+            # CSRField("go", size=1, description="Start the conversion", pulse=True),
+        ])
+        self.result = CSRStatus(name="result", fields=[
+            CSRField("data", size=10, description="Result of last conversion"),
+            CSRField("done", size=1, description="Conversion is done. Cleared on read."),
+        ])
+        self.convcount = CSRStatus(name="convcount", size=8)
+        fsm = FSM(reset_state="IDLE")
+        self.submodules += fsm
+        sclk = Signal()
+        cipo = Signal()
+        copi = Signal()
+        cs_n = Signal(2)
+        self.comb += [
+            pads.sclk.eq(sclk),
+            pads.copi.eq(copi),
+            cipo.eq(pads.cipo),
+            pads.cs0_n.eq(cs_n[0]),
+            pads.cs1_n.eq(cs_n[1])
+        ]
+        cycle = Signal(4)
+        done = Signal()
+        data = Signal(10)
+        self.sync += [
+            If(self.result.we,
+                self.result.fields.done.eq(0)
+            ).Elif(done,
+                self.result.fields.done.eq(1)
+            ).Else(
+                self.result.fields.done.eq(self.result.fields.done)
+            )
+        ]
+        fsm.act("IDLE",
+            NextValue(sclk, 1),
+            NextValue(copi, 0),
+            NextValue(cycle, 0),
+            NextValue(done, 0),
+
+            NextValue(self.result.fields.data, data),
+            NextValue(self.convcount.status, self.convcount.status + 1),
+            NextState("PHASE0"),
+            If(self.ctrl.fields.channel[3] == 0,
+                NextValue(cs_n, 0b10)
+            ).Else(
+                NextValue(cs_n, 0b01)
+            )
+            #If(self.ctrl.fields.go,
+            #    NextState("PHASE0"),
+            #    If(self.ctrl.fields.channel[3] == 0,
+            #        NextValue(cs_n, 0b10)
+            #    ).Else(
+            #        NextValue(cs_n, 0b01)
+            #    )
+            #).Else(
+            #    NextValue(cs_n, 0b11),
+            #)
+        )
+        fsm.act("PHASE0",
+            NextValue(sclk, 0),
+            NextState("PHASE1")
+        ),
+        fsm.act("PHASE1",
+            If(cycle == 2,
+                NextValue(copi, self.ctrl.fields.channel[2])
+            ).Elif(cycle == 3,
+                NextValue(copi, self.ctrl.fields.channel[1])
+            ).Else(
+                NextValue(copi, self.ctrl.fields.channel[0])
+            ),
+            NextState("PHASE2")
+        ),
+        fsm.act("PHASE2",
+            NextValue(sclk, 1),
+            If((cycle >= 4) & (cycle <= 13),
+                NextValue(data, Cat(cipo, data[:-1]))
+            ),
+            NextState("PHASE3"),
+        ),
+        fsm.act("PHASE3",
+            If(cycle < 0xf,
+                NextValue(cycle, cycle + 1),
+                NextState("PHASE0")
+            ).Else(
+                NextState("CS1"),
+                NextValue(done, 1),
+            ),
+        )
+        fsm.act("CS1",
+            NextState("CS2"),
+            NextValue(cs_n, 0b11),
+        )
+        fsm.act("CS2",
+            NextState("IDLE"),
+            NextValue(cs_n, 0b11),
+        )
+
 # ADC -------------------------------------------------------------------------------------------
 class Adc(Module, AutoDoc, AutoCSR):
     def __init__(self, pads):
@@ -210,10 +312,16 @@ class Adc(Module, AutoDoc, AutoCSR):
             ).Else(
                 NextValue(copi, self.ctrl.fields.channel[0])
             ),
+            NextState("PHASE1w")
+        ),
+        fsm.act("PHASE1w",
             NextState("PHASE2")
         ),
         fsm.act("PHASE2",
             NextValue(sclk, 1),
+            NextState("PHASE2s"),
+        ),
+        fsm.act("PHASE2s",
             If((cycle >= 4) & (cycle <= 13),
                 NextValue(self.result.fields.data, Cat(cipo, self.result.fields.data[:-1]))
             ),
