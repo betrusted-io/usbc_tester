@@ -43,7 +43,9 @@ impl Adc {
         }
     }
     pub fn read_inner(&mut self, ch: u32) -> u16 {
+        const AVERAGING: u32 = 16;
         // first one specifies the channel
+        let mut cum = 0;
         self.adc.wo(utra::adc::CONTROL,
             self.adc.ms(utra::adc::CONTROL_CHANNEL, ch as u32) |
             self.adc.ms(utra::adc::CONTROL_GO, 1)
@@ -51,15 +53,18 @@ impl Adc {
         while self.adc.rf(utra::adc::RESULT_DONE) == 0 {
             // busy wait
         }
-        // second one gets the actual channel, due to the pipelining
-        self.adc.wo(utra::adc::CONTROL,
-            self.adc.ms(utra::adc::CONTROL_CHANNEL, ch as u32) |
-            self.adc.ms(utra::adc::CONTROL_GO, 1)
-        );
-        while self.adc.rf(utra::adc::RESULT_DONE) == 0 {
-            // busy wait
+        // now average over 16 samples
+        for _ in 0..AVERAGING {
+            self.adc.wo(utra::adc::CONTROL,
+                self.adc.ms(utra::adc::CONTROL_CHANNEL, ch as u32) |
+                self.adc.ms(utra::adc::CONTROL_GO, 1)
+            );
+            while self.adc.rf(utra::adc::RESULT_DONE) == 0 {
+                // busy wait
+            }
+            cum += self.adc.rf(utra::adc::RESULT_DATA);
         }
-        self.adc.rf(utra::adc::RESULT_DATA) as u16
+        (cum / AVERAGING) as u16
     }
     /// given an ADC channel, return the delta of the reading versus the calibration
     pub fn read(&mut self, channel: utralib::Field) -> Option<u16> {
@@ -89,9 +94,9 @@ impl Adc {
         // set the mux to 0
         self.dut.wo(utra::dut::DUT, 0);
 
-        loghexln!(LL::Info, " cal: ", cal);
-        loghexln!(LL::Info, "meas: ", meas);
-        loghexln!(LL::Info, "  ch: ", ch);
+        loghexln!(LL::Trace, " cal: ", cal);
+        loghexln!(LL::Trace, "meas: ", meas);
+        loghexln!(LL::Trace, "  ch: ", ch);
 
         if meas >= cal {
             Some(0)

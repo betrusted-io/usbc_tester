@@ -69,6 +69,14 @@ impl SbLed {
     }
 
     pub fn idle(&mut self) {
+        // turn off non-PWM items
+        self.csr.wo(
+            utra::sbled::RAW,
+            self.csr.ms(utra::sbled::RAW_R, 0) |  // white
+            self.csr.ms(utra::sbled::RAW_G, 0) |  // red
+            self.csr.ms(utra::sbled::RAW_B, 0)    // green
+        );
+
         // restore the "breathe" mode function
         self.csr.wo(
             utra::sbled::CTRL,
